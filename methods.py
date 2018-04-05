@@ -13,7 +13,8 @@ norm = matplotlib.colors.Normalize()
 def denoiser(denoiser_name, img,sigma):
     from skimage.restoration import (denoise_tv_chambolle, denoise_bilateral, denoise_wavelet, denoise_nl_means, wiener)
     if denoiser_name == 'wavelet':
-        return denoise_wavelet(img,sigma=sigma, mode='soft', multichannel=True,convert2ycbcr=True, method='BayesShrink')
+        
+        return denoise_wavelet(img,sigma=sigma, mode='soft', multichannel=True,convert2ycbcr=True)
     elif denoiser_name == 'TVM':
         return denoise_tv_chambolle(img, multichannel=True)
     elif denoiser_name == 'bilateral':

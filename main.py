@@ -5,10 +5,12 @@ from glob import glob
 import numpy as np
 from utils import *
 from methods import pixel_deflection, denoiser
+import scipy.misc
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # silences the TF INFO messages
 
 def get_arguments():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-attack'      , action='store_true')
     parser.add_argument('-image'            , type=str ,  default= 'images/n02447366_00008562.png')
     parser.add_argument('-map'              , type=str ,  default= 'maps/n02447366_00008562.png')
     parser.add_argument('-directory'        , type=str ,  default= './images/')
@@ -23,6 +25,7 @@ def get_arguments():
     return parser.parse_args()
 
 def classify_images(images, class_names, supress_print=False):
+    print("TYPES", [x.shape for x in images])
     total, top1, top5 = 0,0,0
     images = preprocess_input(np.stack(images,axis=0))
     predictions = decode_predictions(model.predict(images),top=5)
@@ -60,6 +63,46 @@ def process_image_parallel(args):
     t1,t5 = sum([i[0] for i in scores])/len(scores), sum([i[1] for i in scores])/len(scores)
     print('After recovery Top 1 accuracy is {0:.2f} and Top 5 accuracy is {1:.2f}'.format(t1,t5))
 
+
+def attack(model, args):
+    import keras.backend as K
+    import tensorflow as tf
+    class_name = args.image.split('/')[-1].split('_')[0]
+    
+    img = get_img(args.image)[np.newaxis,:,:,:]
+    initial = np.copy(img)
+    x = tf.placeholder(tf.float32, [1, 224, 224, 3])
+    out = tf.log(model(preprocess_input(x)))
+    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=out,
+                                                          labels=924+np.zeros(1,dtype=np.int32))
+
+    grads = tf.gradients(loss, [x])[0]
+    grads = tf.sign(grads)
+    
+    sess = K.get_session()
+
+    def defend(image):
+        map = np.zeros((image.shape[0],image.shape[1]))
+        img = pixel_deflection(image, map, args.deflections, args.window, args.sigma)
+        return denoiser(args.denoiser, img/255.0, args.sigma)*255.0
+    
+    for i in range(30):
+        print('real pred', np.argmax(sess.run(out, {x: img})), sess.run(loss, {x: img}))
+        res = np.array([defend(img[0])],dtype=np.float32)
+        print('def pred', np.argmax(sess.run(out, {x: res})), sess.run(loss, {x: res}))
+
+        img -= sess.run(grads, {x: res})
+        img = np.clip(img, initial-8, initial+8)
+        img = np.clip(img, 0, 255)
+
+    scipy.misc.imsave("/tmp/"+args.image.split("/")[-1], img[0])
+    print("Dumped output to","/tmp/"+args.image.split("/")[-1])
+    res = np.array([defend(img[0])],dtype=np.float32)
+    print('Final prediction', np.argmax(sess.run(out, {x: res})), sess.run(loss, {x: res}))
+    classify_images([res[0]], [class_name])
+        
+    
+    
 if __name__ == '__main__':
     args = get_arguments()
     if args.classifier == 'resnet50':
@@ -76,6 +119,10 @@ if __name__ == '__main__':
         model = Xception(weights='imagenet')
     else:
         raise Exception('Incorrect classifier mentioned. Options: resnet50, inception_v3, vgg19, xception')
+
+    if args.attack:
+        attack(model, args)
+        exit(0)
     
     imagenet_labels = get_imagenet_labels()
     if args.process_batch:
@@ -88,4 +135,5 @@ if __name__ == '__main__':
         classify_images([image], [class_name])
         print('After Defense :')
         image = process_image(args, args.image, defend=True)
+        scipy.misc.imsave("/tmp/a.png", image)
         classify_images([image], [class_name])

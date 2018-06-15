@@ -18,8 +18,9 @@ class Model(robustml.model.Model):
   def threat_model(self):
       return self._threat_model
 
-  def classify(self, x):
-      img = pixel_deflection(x, np.zeros(x.shape[:2]), 200, 10, 0.04)
-      img = denoiser('wavelet', img/255.0, 0.04)*255.0
+  def classify(self, x, deflections=200, window=10, sigma=0.04):
+      img = pixel_deflection(x, np.zeros(x.shape[:2]),
+                             deflections, window, sigma)
+      img = denoiser('wavelet', img/255.0, sigma)*255.0
       img = preprocess_input(np.stack([img],axis=0))
       return np.argmax(self._model.predict(img)[0])

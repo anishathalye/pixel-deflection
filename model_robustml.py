@@ -8,7 +8,7 @@ class Model(robustml.model.Model):
   def __init__(self):
       self._model = ResNet50(weights='imagenet')
       self._dataset = robustml.dataset.ImageNet(shape=(224,224,3))
-      self._threat_model = robustml.threat_model.L2(epsilon=0.05)
+      self._threat_model = robustml.threat_model.Linf(epsilon=0.05)
 
   @property
   def dataset(self):

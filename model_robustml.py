@@ -1,4 +1,4 @@
-from keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
+from keras.applications.resnet50 import ResNet50, preprocess_input
 import numpy as np
 import robustml
 

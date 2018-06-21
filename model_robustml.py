@@ -19,6 +19,7 @@ class Model(robustml.model.Model):
       return self._threat_model
 
   def classify(self, x, deflections=200, window=10, sigma=0.04):
+      x = x * 255.0
       img = pixel_deflection(x, np.zeros(x.shape[:2]),
                              deflections, window, sigma)
       img = denoiser('wavelet', img/255.0, sigma)*255.0
